@@ -3,51 +3,68 @@ import pickle
 import numpy as np
 from flask import Flask, request, jsonify
 
+# Create Flask app
 app = Flask(__name__)
 
-# Load the model and scaler
-model_path = os.environ.get('MODEL_PATH', 'models/model.pkl')
-scaler_path = os.environ.get('SCALER_PATH', 'models/scaler.pkl')
+# Setup simple logging
+@app.before_first_request
+def setup_logging():
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    app.logger.info("Flask application started")
 
-# Check if model files exist at startup
-if not os.path.exists(model_path):
-    print(f"WARNING: Model file not found at {model_path}")
-    print(f"Current directory contents: {os.listdir('.')}")
-    print(f"Models directory contents: {os.listdir('models/') if os.path.exists('models/') else 'models/ not found'}")
+# Global variables for model and scaler
+model = None
+scaler = None
 
-if not os.path.exists(scaler_path):
-    print(f"WARNING: Scaler file not found at {scaler_path}")
-
-# Load model and scaler
-try:
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
-    with open(scaler_path, 'rb') as f:
-        scaler = pickle.load(f)
-    print("Model and scaler loaded successfully")
-except Exception as e:
-    print(f"Error loading model or scaler: {str(e)}")
-    # Set placeholder for testing
-    model = None
-    scaler = None
+# Basic route to verify the server is running
+@app.route('/', methods=['GET'])
+def root():
+    return "Housing Price Predictor API is running!"
 
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({"status": "ok", "model_loaded": model is not None, "scaler_loaded": scaler is not None})
+    try:
+        # Attempt to load model and scaler on first health check
+        global model, scaler
+        
+        if model is None or scaler is None:
+            model_path = os.environ.get('MODEL_PATH', 'models/model.pkl')
+            scaler_path = os.environ.get('SCALER_PATH', 'models/scaler.pkl')
+            
+            app.logger.info(f"Loading model from {model_path}")
+            app.logger.info(f"Loading scaler from {scaler_path}")
+            
+            try:
+                with open(model_path, 'rb') as f:
+                    model = pickle.load(f)
+                with open(scaler_path, 'rb') as f:
+                    scaler = pickle.load(f)
+                app.logger.info("Model and scaler loaded successfully")
+            except Exception as e:
+                app.logger.error(f"Error loading model or scaler: {str(e)}")
+        
+        return jsonify({
+            "status": "ok", 
+            "model_loaded": model is not None, 
+            "scaler_loaded": scaler is not None
+        })
+    except Exception as e:
+        app.logger.error(f"Health check failed: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/predict', methods=['POST'])
 def predict():
     """Prediction endpoint"""
     try:
-        # Get input data
         data = request.json
+        app.logger.info(f"Received prediction request: {data}")
         
-        # Check if we have valid model and scaler
         if model is None or scaler is None:
             return jsonify({"error": "Model or scaler not loaded"}), 500
         
-        # Convert to feature array (ensure proper ordering)
+        # Convert to feature array
         features = np.array([[
             float(data.get('longitude', 0)),
             float(data.get('latitude', 0)),
@@ -71,9 +88,9 @@ def predict():
         })
     
     except Exception as e:
+        app.logger.error(f"Prediction error: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    # When run directly, bind to all interfaces
-    print("Starting API server...")
+    print("Starting Flask API server on port 5000...")
     app.run(host='0.0.0.0', port=5000, debug=False)
