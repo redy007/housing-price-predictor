@@ -60,25 +60,25 @@ jobs:
         run: |
           # We use a heredoc to cleanly embed multiple lines of Python code
           cat <<EOF > train.py
-import pandas as pd
-from src.data_processing import load_data, preprocess_data, save_scaler
-from src.model import train_model, save_model
-from src.evaluate import evaluate_model
+          import pandas as pd
+          from src.data_processing import load_data, preprocess_data, save_scaler
+          from src.model import train_model, save_model
+          from src.evaluate import evaluate_model
 
-# Load and preprocess data
-df = load_data('data/housing.csv')
-X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
+          # Load and preprocess data
+          df = load_data('data/housing.csv')
+          X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
 
-# Train and save model
-model = train_model(X_train, y_train)
-save_model(model)
-save_scaler(scaler)
+          # Train and save model
+          model = train_model(X_train, y_train)
+          save_model(model)
+          save_scaler(scaler)
 
-# Evaluate model
-metrics = evaluate_model(model, X_test, y_test)
-print(f'Model RMSE: {metrics["rmse"]}')
-print(f'Model R²: {metrics["r2"]}')
-EOF
+          # Evaluate model
+          metrics = evaluate_model(model, X_test, y_test)
+          print(f'Model RMSE: {metrics["rmse"]}')
+          print(f'Model R²: {metrics["r2"]}')
+          EOF
 
           # Now run the training script
           python train.py
