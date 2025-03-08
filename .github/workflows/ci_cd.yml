@@ -108,10 +108,14 @@ jobs:
           echo "Created tarball of models:"
           ls -la models.tar.gz
 
-      # Try a different approach for artifacts - store in workspace directly
+      # Fixed save artifacts step - no need to copy the file since it's already in the workspace
       - name: Save model artifacts
         run: |
-          cp models.tar.gz $GITHUB_WORKSPACE/
+          # Just verify the file exists and show its location
+          echo "Models tarball location:"
+          find $GITHUB_WORKSPACE -name "models.tar.gz"
+          # Create a simple marker file to indicate success
+          echo "Models successfully created" > models_ready.txt
 
   # 3) Build-docker job
   build-docker:
