@@ -11,11 +11,15 @@ def preprocess_data(df):
     """Preprocess the housing data."""
     # Handle missing values
     df = df.dropna()
+
+    # Drop ocean_proximity to avoid float conversion errors
+    if 'ocean_proximity' in df.columns:
+        df = df.drop('ocean_proximity', axis=1)
     
     # Select features and target
     X = df.drop('median_house_value', axis=1)
     y = df['median_house_value']
-    
+
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
