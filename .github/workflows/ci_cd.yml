@@ -7,118 +7,113 @@ on:
     branches: [ main ]
 
 jobs:
+  # 1) Test job
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      
+
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.9'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Run tests
         run: |
           pytest tests/
-      
+
       - name: Check code style
         run: |
           flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
-  
+
+  # 2) Build-and-train job
   build-and-train:
     needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      
+
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.9'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Download sample dataset
         run: |
           mkdir -p data
-          # In a real repository, you'd have your own data or a secure link
-          # For demonstration, we fetch a public sample housing dataset
-          # This step can be replaced with your own data source
           echo "Downloading example dataset..."
-          # Using 'wget' as an example, but it's optional
           wget https://raw.githubusercontent.com/ageron/handson-ml/master/datasets/housing/housing.csv -O data/housing.csv
-      
+
       - name: Train model
         run: |
-          # Create a training script inline
           echo '
           import pandas as pd
           from src.data_processing import load_data, preprocess_data, save_scaler
           from src.model import train_model, save_model
           from src.evaluate import evaluate_model
-          
+
           # Load and preprocess data
           df = load_data("data/housing.csv")
           X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
-          
+
           # Train and save model
           model = train_model(X_train, y_train)
           save_model(model)
           save_scaler(scaler)
-          
+
           # Evaluate model
           metrics = evaluate_model(model, X_test, y_test)
-          print(f"Model RMSE: {metrics[\"rmse\"]}")
-          print(f"Model R²: {metrics[\"r2\"]}")
+          print(f"Model RMSE: {metrics["rmse"]}")
+          print(f"Model R²: {metrics["r2"]}")
           ' > train.py
-          
           python train.py
-      
-      - name: Save model and scaler
+
+      - name: Upload model and scaler
         uses: actions/upload-artifact@v2
         with:
-          name: models
-          path: models/
-  
+          name: models          # Artifact name
+          path: models/         # Directory containing trained model files
+
+  # 3) Build-docker job
   build-docker:
     needs: build-and-train
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      
-      - name: Download models
+
+      - name: Download model artifacts
         uses: actions/download-artifact@v2
         with:
-          name: models
-          path: models/
-      
-      - name: Build and push Docker image
+          name: models          # Must match the "name" used in the upload step
+
+      - name: Build Docker image
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: false  # In a real scenario, you would push to a Docker registry
+          push: false
           tags: housing-price-predictor:latest
-      
+
       - name: Test Docker container
         run: |
           docker run -d -p 5000:5000 --name predictor housing-price-predictor:latest
-          sleep 5  # Give the container a moment to start
-          
+          sleep 5
           # Test health endpoint
           response=$(curl -s http://localhost:5000/health)
           echo "Health check response: $response"
-          
+
           # Test prediction endpoint
           curl -X POST -H "Content-Type: application/json" -d '{
             "longitude": -122.23,
