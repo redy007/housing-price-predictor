@@ -58,8 +58,6 @@ jobs:
 
       - name: Train model
         run: |
-          # IMPORTANT: Use a double-quoted string for the shell,
-          # with single quotes inside your Python code to avoid conflicts.
           echo "
           import pandas as pd
           from src.data_processing import load_data, preprocess_data, save_scaler
@@ -84,11 +82,11 @@ jobs:
           # Run the training script
           python train.py
 
-          - name: Upload model and scaler
-            uses: actions/upload-artifact@v2
-            with:
-              name: models          # Artifact name
-              path: models/         # Directory containing trained model files
+      - name: Upload model and scaler
+        uses: actions/upload-artifact@v2
+        with:
+          name: models          # Artifact name
+          path: models/         # Directory containing trained model files
 
   # 3) Build-docker job
   build-docker:
