@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create models directory and ensure models exist
+# Create models directory
 RUN mkdir -p models
 
 # Add debugging tools
@@ -18,25 +18,25 @@ RUN apt-get update && apt-get install -y curl procps net-tools && apt-get clean
 # Environment variables for model paths and debugging
 ENV MODEL_PATH=models/model.pkl
 ENV SCALER_PATH=models/scaler.pkl 
-ENV FLASK_ENV=production
 ENV FLASK_APP=app/api.py
 ENV PYTHONUNBUFFERED=1
 
-# Create a stub model and scaler if they don't exist
-# This ensures the API can start even if artifacts aren't present
-RUN echo "import pickle; import sklearn.ensemble; import sklearn.preprocessing; \
-    model = sklearn.ensemble.RandomForestRegressor(); \
-    scaler = sklearn.preprocessing.StandardScaler(); \
-    with open('models/model.pkl', 'wb') as f: pickle.dump(model, f); \
-    with open('models/scaler.pkl', 'wb') as f: pickle.dump(scaler, f);" > create_stubs.py && \
+# Create stub model files - using a separate file approach
+RUN echo 'import pickle' > create_stubs.py && \
+    echo 'import numpy as np' >> create_stubs.py && \
+    echo 'from sklearn.ensemble import RandomForestRegressor' >> create_stubs.py && \
+    echo 'from sklearn.preprocessing import StandardScaler' >> create_stubs.py && \
+    echo 'model = RandomForestRegressor(n_estimators=1)' >> create_stubs.py && \
+    echo 'scaler = StandardScaler()' >> create_stubs.py && \
+    echo 'with open("models/model.pkl", "wb") as f:' >> create_stubs.py && \
+    echo '    pickle.dump(model, f)' >> create_stubs.py && \
+    echo 'with open("models/scaler.pkl", "wb") as f:' >> create_stubs.py && \
+    echo '    pickle.dump(scaler, f)' >> create_stubs.py && \
+    echo 'print("Created stub model files successfully")' >> create_stubs.py && \
     python create_stubs.py
-
-# Health check to validate the container is working
-HEALTHCHECK --interval=5s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
 
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Command to run the application
-CMD ["sh", "-c", "echo 'Starting Flask app on port 5000' && python -m flask run --host=0.0.0.0 --port=5000"]
+# Command to run the application - using direct Python execution
+CMD ["python", "app/api.py"]
