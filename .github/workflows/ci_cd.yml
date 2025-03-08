@@ -81,27 +81,27 @@ jobs:
           print(f'Model R²: {metrics[\"r2\"]}')
           " > train.py
 
-                    # Run the training script
-                    python train.py
+            # Run the training script
+            python train.py
 
-                - name: Upload model and scaler
-                  uses: actions/upload-artifact@v2
-                  with:
-                    name: models          # Artifact name
-                    path: models/         # Directory containing trained model files
+      - name: Upload model and scaler
+        uses: actions/upload-artifact@v2
+        with:
+          name: models          # Artifact name
+          path: models/         # Directory containing trained model files
 
-            # 3) Build-docker job
-            build-docker:
-              needs: build-and-train
-              runs-on: ubuntu-latest
-              steps:
-                - name: Check out code
-                  uses: actions/checkout@v2
+  # 3) Build-docker job
+  build-docker:
+    needs: build-and-train
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
 
-                - name: Download model artifacts
-                  uses: actions/download-artifact@v2
-                  with:
-                    name: models          # Must match the "name" used in the upload step
+      - name: Download model artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: models          # Must match the "name" used in the upload step
 
       - name: Build Docker image
         uses: docker/build-push-action@v2
