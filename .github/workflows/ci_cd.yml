@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
@@ -38,10 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
@@ -58,6 +58,9 @@ jobs:
 
       - name: Train model
         run: |
+          # Create models directory to ensure it exists
+          mkdir -p models
+          
           echo "
           import pandas as pd
           from src.data_processing import load_data, preprocess_data, save_scaler
@@ -81,12 +84,16 @@ jobs:
 
           # Run the training script
           python train.py
+          
+          # List files to verify models were created
+          ls -la models/
 
       - name: Upload model and scaler
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: models          # Artifact name
           path: models/         # Directory containing trained model files
+          if-no-files-found: error  # Fail if no files are found in the models directory
 
   # 3) Build-docker job
   build-docker:
@@ -94,15 +101,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download model artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: models          # Must match the "name" used in the upload step
+          path: models/         # Specify destination path
+
+      - name: List downloaded artifacts
+        run: ls -la models/
 
       - name: Build Docker image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: false
