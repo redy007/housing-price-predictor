@@ -61,47 +61,47 @@ jobs:
           # IMPORTANT: Use a double-quoted string for the shell,
           # with single quotes inside your Python code to avoid conflicts.
           echo "
-import pandas as pd
-from src.data_processing import load_data, preprocess_data, save_scaler
-from src.model import train_model, save_model
-from src.evaluate import evaluate_model
+          import pandas as pd
+          from src.data_processing import load_data, preprocess_data, save_scaler
+          from src.model import train_model, save_model
+          from src.evaluate import evaluate_model
 
-# Load and preprocess data
-df = load_data('data/housing.csv')
-X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
+          # Load and preprocess data
+          df = load_data('data/housing.csv')
+          X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
 
-# Train and save model
-model = train_model(X_train, y_train)
-save_model(model)
-save_scaler(scaler)
+          # Train and save model
+          model = train_model(X_train, y_train)
+          save_model(model)
+          save_scaler(scaler)
 
-# Evaluate model
-metrics = evaluate_model(model, X_test, y_test)
-print(f'Model RMSE: {metrics[\"rmse\"]}')
-print(f'Model R²: {metrics[\"r2\"]}')
-" > train.py
+          # Evaluate model
+          metrics = evaluate_model(model, X_test, y_test)
+          print(f'Model RMSE: {metrics[\"rmse\"]}')
+          print(f'Model R²: {metrics[\"r2\"]}')
+          " > train.py
 
-          # Run the training script
-          python train.py
+                    # Run the training script
+                    python train.py
 
-      - name: Upload model and scaler
-        uses: actions/upload-artifact@v2
-        with:
-          name: models          # Artifact name
-          path: models/         # Directory containing trained model files
+                - name: Upload model and scaler
+                  uses: actions/upload-artifact@v2
+                  with:
+                    name: models          # Artifact name
+                    path: models/         # Directory containing trained model files
 
-  # 3) Build-docker job
-  build-docker:
-    needs: build-and-train
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
+            # 3) Build-docker job
+            build-docker:
+              needs: build-and-train
+              runs-on: ubuntu-latest
+              steps:
+                - name: Check out code
+                  uses: actions/checkout@v2
 
-      - name: Download model artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: models          # Must match the "name" used in the upload step
+                - name: Download model artifacts
+                  uses: actions/download-artifact@v2
+                  with:
+                    name: models          # Must match the "name" used in the upload step
 
       - name: Build Docker image
         uses: docker/build-push-action@v2
