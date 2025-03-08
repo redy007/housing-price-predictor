@@ -81,8 +81,8 @@ jobs:
           print(f'Model R²: {metrics[\"r2\"]}')
           " > train.py
 
-            # Run the training script
-            python train.py
+          # Run the training script
+          python train.py
 
       - name: Upload model and scaler
         uses: actions/upload-artifact@v2
