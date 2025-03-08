@@ -13,11 +13,14 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -39,11 +42,14 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -54,15 +60,18 @@ jobs:
         run: |
           mkdir -p data
           echo "Downloading example dataset..."
-          wget https://raw.githubusercontent.com/ageron/handson-ml/master/datasets/housing/housing.csv -O data/housing.csv
+          # Use curl instead of wget for better compatibility
+          curl -L https://raw.githubusercontent.com/ageron/handson-ml/master/datasets/housing/housing.csv -o data/housing.csv
+          ls -la data/
 
-      - name: Train model
+      - name: Train model and save artifacts
         run: |
-          # Create models directory to ensure it exists
+          # Create models directory
           mkdir -p models
           
           echo "
           import pandas as pd
+          import os
           from src.data_processing import load_data, preprocess_data, save_scaler
           from src.model import train_model, save_model
           from src.evaluate import evaluate_model
@@ -80,20 +89,29 @@ jobs:
           metrics = evaluate_model(model, X_test, y_test)
           print(f'Model RMSE: {metrics[\"rmse\"]}')
           print(f'Model R²: {metrics[\"r2\"]}')
+          
+          # Ensure the model files exist
+          print('Files in models directory:')
+          for file in os.listdir('models/'):
+              print(f'- {file}')
           " > train.py
 
           # Run the training script
           python train.py
           
-          # List files to verify models were created
+          # Verify models were created
+          echo "Contents of models directory:"
           ls -la models/
+          
+          # Create a tarball of the models to avoid artifact upload issues
+          tar -czvf models.tar.gz models/
+          echo "Created tarball of models:"
+          ls -la models.tar.gz
 
-      - name: Upload model and scaler
-        uses: actions/upload-artifact@v3
-        with:
-          name: models          # Artifact name
-          path: models/         # Directory containing trained model files
-          if-no-files-found: error  # Fail if no files are found in the models directory
+      # Try a different approach for artifacts - store in workspace directly
+      - name: Save model artifacts
+        run: |
+          cp models.tar.gz $GITHUB_WORKSPACE/
 
   # 3) Build-docker job
   build-docker:
@@ -102,31 +120,89 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
-
-      - name: Download model artifacts
-        uses: actions/download-artifact@v3
         with:
-          name: models          # Must match the "name" used in the upload step
-          path: models/         # Specify destination path
+          fetch-depth: 1
 
-      - name: List downloaded artifacts
-        run: ls -la models/
+      # Alternative approach - recreate models from training script
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download sample dataset again
+        run: |
+          mkdir -p data
+          echo "Downloading example dataset..."
+          curl -L https://raw.githubusercontent.com/ageron/handson-ml/master/datasets/housing/housing.csv -o data/housing.csv
+
+      - name: Retrain model for Docker build
+        run: |
+          # Create models directory
+          mkdir -p models
+          
+          # Run the same training script again to generate models
+          # This is a workaround for the artifact download issue
+          echo "
+          import pandas as pd
+          from src.data_processing import load_data, preprocess_data, save_scaler
+          from src.model import train_model, save_model
+          from src.evaluate import evaluate_model
+
+          # Load and preprocess data
+          df = load_data('data/housing.csv')
+          X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
+
+          # Train and save model
+          model = train_model(X_train, y_train)
+          save_model(model)
+          save_scaler(scaler)
+          
+          # Evaluate model
+          metrics = evaluate_model(model, X_test, y_test)
+          print(f'Model RMSE: {metrics[\"rmse\"]}')
+          print(f'Model R²: {metrics[\"r2\"]}')
+          " > train.py
+
+          # Run the training script
+          python train.py
+          
+          # Verify models were created
+          echo "Contents of models directory:"
+          ls -la models/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Build Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
-          push: false
+          load: true
           tags: housing-price-predictor:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Test Docker container
         run: |
           docker run -d -p 5000:5000 --name predictor housing-price-predictor:latest
           sleep 5
-          # Test health endpoint
-          response=$(curl -s http://localhost:5000/health)
-          echo "Health check response: $response"
-
+          
+          # Test health endpoint with retry for container startup
+          for i in {1..5}; do
+            response=$(curl -s http://localhost:5000/health || echo "Failed")
+            echo "Health check response (attempt $i): $response"
+            if [[ "$response" != "Failed" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          
           # Test prediction endpoint
           curl -X POST -H "Content-Type: application/json" -d '{
             "longitude": -122.23,
